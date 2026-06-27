@@ -21,5 +21,29 @@
     },
     "active": null
   },
-  "updatedAt": 1782547837189
+  "cache": {
+    "ts": 1782553205412,
+    "mspa": {
+      "ok": true,
+      "waterTempC": 32,
+      "targetTempC": 34,
+      "filter": false,
+      "heater": false,
+      "ozone": false,
+      "uvc": false,
+      "bubble": false,
+      "online": true
+    },
+    "ac": {
+      "ok": true,
+      "on": false,
+      "mode": "auto",
+      "targetTemp": 25,
+      "fan": "auto",
+      "indoorTemp": 29,
+      "outdoorTemp": null
+    }
+  },
+  "lastSoc": 70,
+  "updatedAt": 1782553205653
 }

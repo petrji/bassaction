@@ -1,8 +1,10 @@
 name: BassAction
 
 on:
+  repository_dispatch:        # the ESP pushes SOC here (event_type: soc) → instant run
+    types: [soc]
   schedule:
-    - cron: '*/15 * * * *'   # every 15 min (UTC; the app localises to Prague itself)
+    - cron: '*/15 * * * *'   # heartbeat / filtration even if the ESP is offline
   workflow_dispatch:          # manual "Run workflow" button
 
 # Don't let two runs overlap (and don't cancel an in-flight one mid-command).
@@ -11,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write             # to commit state.json + docs/status.json back
+  contents: read              # state + dashboard live in a Gist now — no repo writes
 
 jobs:
   run:
@@ -29,6 +31,10 @@ jobs:
       - name: Run automation
         env:
           CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
+          SOC_OVERRIDE:         ${{ github.event.client_payload.soc }}
+          READ_INTERVAL_MIN:    ${{ vars.READ_INTERVAL_MIN }}
+          GIST_ID:              ${{ vars.GIST_ID }}
+          GIST_TOKEN:           ${{ secrets.GIST_TOKEN }}
           SEMS_ACCOUNT:         ${{ secrets.SEMS_ACCOUNT }}
           SEMS_PASSWORD:        ${{ secrets.SEMS_PASSWORD }}
           SEMS_STATION_ID:      ${{ secrets.SEMS_STATION_ID }}
@@ -43,15 +49,4 @@ jobs:
           TOSHIBA_CLIENT_ID:    ${{ secrets.TOSHIBA_CLIENT_ID }}
           TOSHIBA_AC_UNIQUE_ID: ${{ secrets.TOSHIBA_AC_UNIQUE_ID }}
         run: npm start
-
-      - name: Commit state + status
-        run: |
-          git config user.name  "bassaction-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add state.json docs/status.json
-          if git diff --cached --quiet; then
-            echo "no changes"
-          else
-            git commit -m "data: update [skip ci]"
-            git push
-          fi
+        # No commit step: state + status are written to the Gist via the API.

@@ -57,9 +57,12 @@ function card(title, rowsHtml) {
 function row(k, v) { return `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
 
 function render(s) {
+  const dev = s.devices || {};
+  const devTxt = dev.fresh ? '· spa/AC: live' : (dev.ageSec != null ? `· spa/AC: cached ${Math.round(dev.ageSec/60)}m` : '');
   document.getElementById('updated').textContent =
     'Updated ' + new Date(s.updatedAt).toLocaleString() +
-    (s.localTime ? `  ·  Prague ${String(s.localTime.hour).padStart(2,'0')}:00` : '');
+    (s.localTime ? `  ·  Prague ${String(s.localTime.hour).padStart(2,'0')}:00` : '') +
+    (devTxt ? '  ' + devTxt : '');
   const mode = document.getElementById('mode');
   mode.textContent = s.controlEnabled ? 'CONTROL ON' : 'read-only';
   mode.className = 'pill ' + (s.controlEnabled ? 'on' : 'dim');
@@ -70,9 +73,11 @@ function render(s) {
   const g = s.solar || {};
   if (g.ok) {
     const soc = g.batterySOC ?? 0;
+    const src = g.source === 'esp-local' ? 'local ESP' : g.source === 'sems' ? 'SEMS cloud' : '';
     cards.push(card('☀️ Solar / Battery',
       `<div class="big">${n(g.batterySOC,'%')}</div>
        <div class="bar"><i style="width:${Math.max(0,Math.min(100,soc))}%"></i></div>` +
+      (src ? row('Source', `<span class="v">${src}</span>`) : '') +
       row('Battery', (g.charging===true?'charging ▲':g.charging===false?'discharging ▼':'—') + ' ' + n(g.batteryPower,' W')) +
       row('PV', n(g.pvPower,' W')) +
       row('Load', n(g.loadPower,' W')) +
@@ -127,12 +132,19 @@ function render(s) {
   document.getElementById('cards').innerHTML = cards.join('');
 }
 
+// Status now lives in a Gist (no per-run repo commits). Falls back to a local
+// file when the Gist id hasn't been filled in (e.g. local preview).
+const GIST_ID = 'c7fa211c4f361f51cc9c10053fb6e842';
+const STATUS_URL = GIST_ID.startsWith('REPLACE')
+  ? './status.json'
+  : `https://gist.githubusercontent.com/petrji/${GIST_ID}/raw/status.json`;
+
 async function load() {
   try {
-    const r = await fetch('./status.json?t=' + Date.now());
+    const r = await fetch(STATUS_URL + '?t=' + Date.now(), { cache: 'no-store' });
     render(await r.json());
   } catch (e) {
-    document.getElementById('updated').innerHTML = '<span class="err">No status.json yet — waiting for the first run.</span>';
+    document.getElementById('updated').innerHTML = '<span class="err">No status yet — waiting for the first run.</span>';
   }
 }
 load();

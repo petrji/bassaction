@@ -4,17 +4,14 @@ try { require('dotenv').config(); } catch { /* dotenv optional; CI uses real env
 //   1. read all three services (resilient — one failure doesn't sink the rest)
 //   2. run the automation engine
 //   3. optionally send commands (config.controlEnabled)
-//   4. write docs/status.json (dashboard) and state.json (persisted), then exit
-const fs = require('fs');
-const path = require('path');
+//   4. persist state + publish the dashboard status (Gist in CI, files in dev)
 const cfg = require('./config');
 const state = require('./state');
+const store = require('./store');
 const { decide } = require('./automation');
 const goodwe = require('./goodwe');
 const mspa = require('./mspa');
 const toshiba = require('./toshiba');
-
-const STATUS_FILE = path.join(__dirname, '..', 'docs', 'status.json');
 
 async function safe(label, fn) {
   try { return { ok: true, ...(await fn()) }; }
@@ -24,17 +21,48 @@ async function safe(label, fn) {
 async function main() {
   console.log(`BassAction run @ ${new Date().toISOString()}  control=${cfg.controlEnabled}`);
 
-  // 1. Read everything in parallel.
-  const [g, m, a] = await Promise.all([
-    safe('goodwe',  () => goodwe.getStatus()),
-    safe('mspa',    () => mspa.getState()),
-    safe('toshiba', () => toshiba.getState()),
-  ]);
+  // 1. Read everything. SOC comes from the ESP (repository_dispatch payload) when
+  //    present; otherwise fall back to the SEMS cloud if it's configured.
+  const socOverride = process.env.SOC_OVERRIDE;
+  const haveEspSoc = socOverride != null && socOverride !== '' && !Number.isNaN(Number(socOverride));
+
+  const readSolar = async () => {
+    if (haveEspSoc) {
+      return { ok: true, source: 'esp-local', batterySOC: Number(socOverride), online: true,
+               pvPower: null, batteryPower: null, charging: null, loadPower: null, gridPower: null };
+    }
+    if (cfg.goodwe.enabled) return safe('goodwe', async () => ({ source: 'sems', ...(await goodwe.getStatus()) }));
+    return { ok: false, error: 'no ESP SOC and SEMS not configured' };
+  };
+
+  const st = state.parse(await store.loadStateRaw());
+  const now = Date.now();
+
+  // Spa/AC: re-fetch only when the cache is stale; otherwise reuse last reading.
+  const cacheAge = now - (st.cache.ts || 0);
+  const haveCache = st.cache.mspa && st.cache.ac;
+  const devicesFresh = !(haveCache && cacheAge < cfg.deviceReadMs);
+
+  let g, m, a;
+  if (devicesFresh) {
+    [g, m, a] = await Promise.all([
+      readSolar(),
+      safe('mspa',    () => mspa.getState()),
+      safe('toshiba', () => toshiba.getState()),
+    ]);
+    // Keep the last *good* reading if a fetch failed this round.
+    m = m.ok ? m : (st.cache.mspa || m);
+    a = a.ok ? a : (st.cache.ac || a);
+    st.cache = { ts: now, mspa: m, ac: a };
+  } else {
+    g = await readSolar();                 // SOC is always fresh (cheap / from ESP)
+    m = st.cache.mspa;
+    a = st.cache.ac;
+  }
   const readings = { goodwe: g, mspa: m, ac: a };
 
   // 2. Decide.
-  const st = state.load();
-  const decisions = decide(readings, st);
+  const decisions = decide(readings, st, now, cfg.controlEnabled, devicesFresh);
   console.log('decisions:', JSON.stringify(decisions, null, 2));
 
   // 3. Act (only if enabled). Each command is best-effort.
@@ -63,8 +91,19 @@ async function main() {
     await run('filtration filter OFF', () => mspa.setFilter(false));
   }
 
-  // 4. Persist + publish.
-  state.save(st);
+  // 4. Persist + publish — but only when something worth recording changed, so a
+  //    1-minute cadence doesn't commit ~1400 near-identical files/day. A fresh
+  //    device read, any action, a SOC change, or a filtration event all qualify;
+  //    a fresh read happens at least every deviceReadMs, bounding dashboard lag.
+  const f2 = decisions.filtration || {};
+  const socChanged = decisions.soc != null && decisions.soc !== st.lastSoc;
+  if (decisions.soc != null) st.lastSoc = decisions.soc;
+  const realAction = cfg.controlEnabled && (actions.length > 0 || f2.start || f2.stop || f2.stopOzone);
+  const meaningful = devicesFresh || socChanged || !!realAction;
+  if (!meaningful) {
+    console.log('no meaningful change since last run — skipping write');
+    return;
+  }
 
   const status = {
     updatedAt: new Date().toISOString(),
@@ -73,6 +112,7 @@ async function main() {
     solar: g,
     mspa: m,
     ac: a,
+    devices: { fresh: devicesFresh, ageSec: Math.round((now - st.cache.ts) / 1000) },
     automation: {
       soc: decisions.soc,
       mspaHeater: decisions.mspaHeater,
@@ -82,10 +122,10 @@ async function main() {
     },
     actions,
   };
-  fs.mkdirSync(path.dirname(STATUS_FILE), { recursive: true });
-  fs.writeFileSync(STATUS_FILE, JSON.stringify(status, null, 2) + '\n');
+
+  await store.publish(state.serialize(st), JSON.stringify(status, null, 2) + '\n');
   console.log('actions:', actions);
-  console.log('status written →', STATUS_FILE);
+  console.log(`published (${store.useGist ? 'gist' : 'local files'})`);
 }
 
 main().catch((e) => { console.error('FATAL', e); process.exit(1); });

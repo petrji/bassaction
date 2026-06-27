@@ -24,15 +24,19 @@ function pragueNow(now = new Date()) {
 // only committed when `actuate` is true — i.e. when a command is really sent. In
 // read-only mode (actuate=false) we report what we WOULD do without pretending we
 // did it, so state never drifts from reality.
-function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, now, t, actuate }) {
-  // Record the effect of an actually-issued command.
+// `fresh` = the device reading is a real fetch this run (not the cached value).
+// Manual-change detection and lastKnownOn sync only make sense against a fresh
+// reading; on cached runs we act on our own believed state (dev.lastKnownOn) so
+// SOC-driven start/stop still works every minute without false override trips.
+function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, now, t, actuate, fresh }) {
   const commit = (on) => {
     dev.lastKnownOn = on; dev.ownedByAuto = on; dev.lastChangeTs = now; dev.lastCmdTs = now;
   };
+  const effOn = fresh ? actualOn : dev.lastKnownOn;
 
-  // 1. Detect a manual change: device state differs from what we last set, and
-  //    we're past the settle window (so it isn't just our own pending command).
-  if (actualOn !== dev.lastKnownOn && now > dev.lastCmdTs + cfg.settleMs) {
+  // 1. Detect a manual change (fresh reads only): device differs from what we
+  //    last set, past the settle window (so it isn't our own pending command).
+  if (fresh && actualOn !== dev.lastKnownOn && now > dev.lastCmdTs + cfg.settleMs) {
     dev.overrideUntil = now + cfg.overrideMs;
     dev.ownedByAuto = false;        // a human is in control now — relinquish
     dev.lastKnownOn = actualOn;
@@ -42,12 +46,12 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
 
   // 2. Honour an active manual override.
   if (now < dev.overrideUntil) {
-    dev.lastKnownOn = actualOn;
+    if (fresh) dev.lastKnownOn = actualOn;
     return { action: null, note: `override active (${Math.round((dev.overrideUntil - now) / 60000)} min left)` };
   }
 
   // 3. Night force-off: only ever stops what automation itself started.
-  if (t.hour >= cfg.nightOffHour && actualOn && dev.ownedByAuto) {
+  if (t.hour >= cfg.nightOffHour && effOn && dev.ownedByAuto) {
     if (now >= dev.lastChangeTs + cfg.minOnMs) {
       if (actuate) commit(false);
       return { action: 'off', note: 'night force-off' };
@@ -59,17 +63,17 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
   const wantOff = soc <= socStop;
 
   // 4. Turn ON (only in the day window, above start SOC, device-specific ok).
-  if (!actualOn && wantOn) {
+  if (!effOn && wantOn) {
     if (now < dev.lastChangeTs + cfg.minOffMs) return { action: null, note: 'min-off not elapsed' };
     if (actuate) commit(true);
     return { action: 'on', note: `start (SOC ${soc}% ≥ ${socStart}%)` };
   }
-  if (!actualOn && inDayWindow && soc >= socStart && !canStart().ok) {
+  if (!effOn && inDayWindow && soc >= socStart && !canStart().ok) {
     return { action: null, note: `start blocked: ${canStart().reason}` };
   }
 
   // 5. Turn OFF — but NEVER stop a device a human started (only auto-owned).
-  if (actualOn && wantOff) {
+  if (effOn && wantOff) {
     if (!dev.ownedByAuto) return { action: null, note: 'on, but user-owned — will not auto-stop' };
     if (now < dev.lastChangeTs + cfg.minOnMs) return { action: null, note: 'min-on not elapsed' };
     if (actuate) commit(false);
@@ -77,8 +81,8 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
   }
 
   // 6. Inside the hysteresis band — hold.
-  dev.lastKnownOn = actualOn;
-  return { action: null, note: 'hold' };
+  if (fresh) dev.lastKnownOn = actualOn;
+  return { action: null, note: fresh ? 'hold' : 'hold (cached)' };
 }
 
 // Build the per-device "may I start?" predicates from current readings.
@@ -112,8 +116,18 @@ function makePredicates(readings) {
 }
 
 // Decide filtration. Returns { start?: {ozone,uvc}, stopOzone?, stop?, note }.
-function evaluateFiltration({ fstate, mspa, t, now, actuate }) {
+function evaluateFiltration({ fstate, mspa, t, now, actuate, fresh }) {
   const f = fstate;
+
+  // On cached runs, only the time-based "end of cycle" needs handling; starting
+  // a cycle and the bubbles-abort safety both need a fresh spa reading.
+  if (!fresh) {
+    if (f.active && now >= f.active.until) {
+      const key = f.active.key; if (actuate) f.active = null;
+      return { stop: true, note: `filtration ${key} complete` };
+    }
+    return { note: f.active ? `filtration ${f.active.key} running` : 'filtration: cached, waiting for fresh read' };
+  }
 
   // If a cycle is running and bubbles came on, abort ozone immediately.
   if (f.active && f.active.ozone && mspa && mspa.ok && mspa.bubble) {
@@ -145,31 +159,31 @@ function evaluateFiltration({ fstate, mspa, t, now, actuate }) {
   return { note: 'no filtration due' };
 }
 
-function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled) {
+function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled, fresh = true) {
   const t = pragueNow(new Date(now));
   const { mspaCanStart, acCanStart } = makePredicates(readings);
   const soc = readings.goodwe && readings.goodwe.ok ? readings.goodwe.batterySOC : null;
 
-  const decisions = { time: t, soc, mspaHeater: null, ac: null, filtration: null };
+  const decisions = { time: t, soc, devicesFresh: fresh, mspaHeater: null, ac: null, filtration: null };
 
   if (soc != null) {
     if (readings.mspa && readings.mspa.ok) {
       decisions.mspaHeater = evaluateDevice({
         name: 'mspaHeater', dev: state.mspa, actualOn: readings.mspa.heater,
-        soc, socStart: cfg.soc.mspaStart, socStop: cfg.soc.mspaStop, canStart: mspaCanStart, now, t, actuate,
+        soc, socStart: cfg.soc.mspaStart, socStop: cfg.soc.mspaStop, canStart: mspaCanStart, now, t, actuate, fresh,
       });
     }
     if (readings.ac && readings.ac.ok) {
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
-        soc, socStart: cfg.soc.acStart, socStop: cfg.soc.acStop, canStart: acCanStart, now, t, actuate,
+        soc, socStart: cfg.soc.acStart, socStop: cfg.soc.acStop, canStart: acCanStart, now, t, actuate, fresh,
       });
     }
   } else {
     decisions.note = 'no SOC reading — solar automation skipped this run';
   }
 
-  decisions.filtration = evaluateFiltration({ fstate: state.filtration, mspa: readings.mspa, t, now, actuate });
+  decisions.filtration = evaluateFiltration({ fstate: state.filtration, mspa: readings.mspa, t, now, actuate, fresh });
   return decisions;
 }
 

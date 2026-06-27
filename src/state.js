@@ -1,10 +1,6 @@
 'use strict';
-// Persistent state between runs. GitHub Actions are stateless, so this file is
-// committed back to the repo each run (see the workflow).
-const fs = require('fs');
-const path = require('path');
-
-const STATE_FILE = path.join(__dirname, '..', 'state.json');
+// State shape + (de)serialization. The actual read/write is in store.js (Gist in
+// CI, local file in dev), so this module is pure — no I/O.
 
 const defaultDevice = () => ({
   ownedByAuto: false, // true only while WE hold the device on
@@ -22,26 +18,28 @@ function defaults() {
       firedDay: { c1: '', c2: '', c3: '' }, // 'YYYY-MM-DD' last fired, per cycle
       active: null,                          // { key, until, ozone } while a cycle runs
     },
+    cache: { ts: 0, mspa: null, ac: null },  // throttled spa/AC readings (see index.js)
+    lastSoc: null,                            // last SOC we persisted (commit-on-change gate)
     updatedAt: 0,
   };
 }
 
-function load() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    return { ...defaults(), ...raw,
-      mspa: { ...defaultDevice(), ...(raw.mspa || {}) },
-      ac:   { ...defaultDevice(), ...(raw.ac || {}) },
-      filtration: { ...defaults().filtration, ...(raw.filtration || {}) },
-    };
-  } catch {
-    return defaults();
-  }
+// Merge a raw JSON string (or null) onto the defaults.
+function parse(raw) {
+  if (!raw) return defaults();
+  let o;
+  try { o = JSON.parse(raw); } catch { return defaults(); }
+  return { ...defaults(), ...o,
+    mspa: { ...defaultDevice(), ...(o.mspa || {}) },
+    ac:   { ...defaultDevice(), ...(o.ac || {}) },
+    filtration: { ...defaults().filtration, ...(o.filtration || {}) },
+    cache: { ...defaults().cache, ...(o.cache || {}) },
+  };
 }
 
-function save(state) {
+function serialize(state) {
   state.updatedAt = Date.now();
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+  return JSON.stringify(state, null, 2) + '\n';
 }
 
-module.exports = { load, save, STATE_FILE };
+module.exports = { defaults, parse, serialize };

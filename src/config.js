@@ -16,11 +16,14 @@ const req = (k) => {
 };
 
 module.exports = {
-  // ── GoodWe / SEMS cloud (no local LAN access from CI — read via the portal) ──
+  // ── GoodWe / SEMS cloud — OPTIONAL fallback only. ──
+  // Primary SOC now arrives from the ESP via repository_dispatch (SOC_OVERRIDE).
+  // SEMS is used only when no ESP value is present; missing creds just disable it.
   goodwe: {
-    account:   req('SEMS_ACCOUNT'),
-    password:  req('SEMS_PASSWORD'),
-    stationId: req('SEMS_STATION_ID'),
+    account:   env('SEMS_ACCOUNT'),
+    password:  env('SEMS_PASSWORD'),
+    stationId: env('SEMS_STATION_ID'),
+    enabled:   !!(env('SEMS_ACCOUNT') && env('SEMS_PASSWORD') && env('SEMS_STATION_ID')),
   },
 
   // ── MSpa cloud ──
@@ -50,6 +53,11 @@ module.exports = {
   // When false, the run only reads + writes status.json (no commands sent).
   // Start here, watch the dashboard, then flip CONTROL_ENABLED=true.
   controlEnabled: env('CONTROL_ENABLED', 'false') === 'true',
+
+  // Spa/AC state is re-fetched at most this often; runs in between reuse the
+  // cached reading (so we can act on fresh SOC every minute without hammering
+  // the device clouds). SOC itself always comes fresh from the ESP push.
+  deviceReadMs: num('READ_INTERVAL_MIN', 5) * 60 * 1000,
 
   soc: {
     mspaStart: num('MSPA_SOC_START', 70),
