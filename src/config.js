@@ -59,6 +59,10 @@ module.exports = {
   // the device clouds). SOC itself always comes fresh from the ESP push.
   deviceReadMs: num('READ_INTERVAL_MIN', 5) * 60 * 1000,
 
+  // How often to pull the informational SEMS figures (PV/load/grid). Not used
+  // for control — SOC comes from the ESP. Tunable via SEMS_INTERVAL_MIN.
+  semsInfoMs: num('SEMS_INTERVAL_MIN', 15) * 60 * 1000,
+
   // Defaults can be overridden per-deployment with repo Variables of the same
   // name (no code change needed). Start high (95%) for now; tune later.
   soc: {

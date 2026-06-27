@@ -21,41 +21,59 @@ async function safe(label, fn) {
 async function main() {
   console.log(`BassAction run @ ${new Date().toISOString()}  control=${cfg.controlEnabled}`);
 
-  // 1. Read everything. SOC comes from the ESP (repository_dispatch payload) when
-  //    present; otherwise fall back to the SEMS cloud if it's configured.
+  // 1. Read everything.
   const socOverride = process.env.SOC_OVERRIDE;
   const haveEspSoc = socOverride != null && socOverride !== '' && !Number.isNaN(Number(socOverride));
 
-  const readSolar = async () => {
-    if (haveEspSoc) {
-      return { ok: true, source: 'esp-local', batterySOC: Number(socOverride), online: true,
-               pvPower: null, batteryPower: null, charging: null, loadPower: null, gridPower: null };
-    }
-    if (cfg.goodwe.enabled) return safe('goodwe', async () => ({ source: 'sems', ...(await goodwe.getStatus()) }));
-    return { ok: false, error: 'no ESP SOC and SEMS not configured' };
-  };
-
   const st = state.parse(await store.loadStateRaw());
   const now = Date.now();
+
+  // SOC drives control and comes fresh from the ESP. The richer SEMS figures
+  // (PV / load / grid / battery power) are INFORMATIONAL only, so we pull them
+  // on a slow cycle and cache them — no control depends on them.
+  let semsFetched = false;
+  if (cfg.goodwe.enabled && now - (st.semsCache.ts || 0) >= cfg.semsInfoMs) {
+    const s = await safe('goodwe', () => goodwe.getStatus());
+    semsFetched = true;
+    if (s.ok) {
+      st.semsCache = { ts: now, data: {
+        pvPower: s.pvPower, loadPower: s.loadPower, gridPower: s.gridPower,
+        batteryPower: s.batteryPower, charging: s.charging, energyToday: s.energyToday,
+        semsSoc: s.batterySOC,   // stationName intentionally omitted (public dashboard)
+      }};
+    } else {
+      st.semsCache = { ...st.semsCache, ts: now, error: s.error }; // back off; keep last good extras
+    }
+  }
+  const extras = st.semsCache.data || {};
+
+  let g;
+  if (haveEspSoc) {
+    g = { ok: true, source: 'esp-local', batterySOC: Number(socOverride), online: true,
+          pvPower: extras.pvPower ?? null, loadPower: extras.loadPower ?? null,
+          gridPower: extras.gridPower ?? null, batteryPower: extras.batteryPower ?? null,
+          charging: extras.charging ?? null, energyToday: extras.energyToday ?? null };
+  } else if (extras.semsSoc != null) {
+    g = { ok: true, source: 'sems', batterySOC: extras.semsSoc, online: true, ...extras };
+  } else {
+    g = { ok: false, error: 'no ESP SOC and SEMS unavailable' };
+  }
 
   // Spa/AC: re-fetch only when the cache is stale; otherwise reuse last reading.
   const cacheAge = now - (st.cache.ts || 0);
   const haveCache = st.cache.mspa && st.cache.ac;
   const devicesFresh = !(haveCache && cacheAge < cfg.deviceReadMs);
 
-  let g, m, a;
+  let m, a;
   if (devicesFresh) {
-    [g, m, a] = await Promise.all([
-      readSolar(),
+    [m, a] = await Promise.all([
       safe('mspa',    () => mspa.getState()),
       safe('toshiba', () => toshiba.getState()),
     ]);
-    // Keep the last *good* reading if a fetch failed this round.
-    m = m.ok ? m : (st.cache.mspa || m);
+    m = m.ok ? m : (st.cache.mspa || m);   // keep last good reading on failure
     a = a.ok ? a : (st.cache.ac || a);
     st.cache = { ts: now, mspa: m, ac: a };
   } else {
-    g = await readSolar();                 // SOC is always fresh (cheap / from ESP)
     m = st.cache.mspa;
     a = st.cache.ac;
   }
@@ -99,7 +117,7 @@ async function main() {
   const socChanged = decisions.soc != null && decisions.soc !== st.lastSoc;
   if (decisions.soc != null) st.lastSoc = decisions.soc;
   const realAction = cfg.controlEnabled && (actions.length > 0 || f2.start || f2.stop || f2.stopOzone);
-  const meaningful = devicesFresh || socChanged || !!realAction;
+  const meaningful = devicesFresh || socChanged || semsFetched || !!realAction;
   if (!meaningful) {
     console.log('no meaningful change since last run — skipping write');
     return;

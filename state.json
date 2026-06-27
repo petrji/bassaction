@@ -1,50 +1,10 @@
 {
-  "mspa": {
-    "ownedByAuto": false,
-    "lastKnownOn": true,
-    "lastChangeTs": 1782554778801,
-    "lastCmdTs": 0,
-    "overrideUntil": 1782561978801
-  },
-  "ac": {
-    "ownedByAuto": false,
-    "lastKnownOn": true,
-    "lastChangeTs": 1782554778801,
-    "lastCmdTs": 0,
-    "overrideUntil": 1782561978801
-  },
-  "filtration": {
-    "firedDay": {
-      "c1": "",
-      "c2": "",
-      "c3": ""
-    },
-    "active": null
-  },
-  "cache": {
-    "ts": 1782554778801,
-    "mspa": {
-      "ok": true,
-      "waterTempC": 32,
-      "targetTempC": 34,
-      "filter": true,
-      "heater": true,
-      "ozone": true,
-      "uvc": true,
-      "bubble": false,
-      "online": true
-    },
-    "ac": {
-      "ok": true,
-      "on": true,
-      "mode": "auto",
-      "targetTemp": 25,
-      "fan": "auto",
-      "indoorTemp": 28,
-      "outdoorTemp": 46
-    }
-  },
-  "lastSoc": 96,
+  "mspa": { "ownedByAuto": false, "lastKnownOn": false, "lastChangeTs": 0, "lastCmdTs": 0, "overrideUntil": 0 },
+  "ac": { "ownedByAuto": false, "lastKnownOn": false, "lastChangeTs": 0, "lastCmdTs": 0, "overrideUntil": 0 },
+  "filtration": { "firedDay": { "c1": "", "c2": "", "c3": "" }, "active": null },
+  "cache": { "ts": 0, "mspa": null, "ac": null },
+  "semsCache": { "ts": 0, "data": null },
+  "lastSoc": null,
   "history": [],
-  "updatedAt": 1782554779455
+  "updatedAt": 0
 }
