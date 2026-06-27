@@ -33,6 +33,10 @@ jobs:
           CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
           SOC_OVERRIDE:         ${{ github.event.client_payload.soc }}
           READ_INTERVAL_MIN:    ${{ vars.READ_INTERVAL_MIN }}
+          MSPA_SOC_START:       ${{ vars.MSPA_SOC_START }}
+          MSPA_SOC_STOP:        ${{ vars.MSPA_SOC_STOP }}
+          AC_SOC_START:         ${{ vars.AC_SOC_START }}
+          AC_SOC_STOP:          ${{ vars.AC_SOC_STOP }}
           GIST_ID:              ${{ vars.GIST_ID }}
           GIST_TOKEN:           ${{ secrets.GIST_TOKEN }}
           SEMS_ACCOUNT:         ${{ secrets.SEMS_ACCOUNT }}

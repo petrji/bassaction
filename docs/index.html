@@ -125,9 +125,19 @@ function render(s) {
     `<div class="row"><span class="k">AC</span></div><div class="actions">${dec(au.ac)}</div>` +
     `<div class="row"><span class="k">Filtration</span></div><div class="actions">${au.filtration?au.filtration.note:'—'}</div>`));
 
-  // Last actions
+  // Last actions (this run only)
   if (s.actions && s.actions.length)
     cards.push(card('📋 Last run actions', `<div class="actions">${s.actions.join('\n')}</div>`));
+
+  // History (persisted, newest first)
+  if (s.history && s.history.length) {
+    const rows = s.history.map(h => {
+      const t = new Date(h.ts).toLocaleString();
+      const soc = h.soc != null ? ` (${h.soc}%)` : '';
+      return `${t}${soc} — ${h.text}`;
+    }).join('\n');
+    cards.push(card('🕘 History (last 10)', `<div class="actions">${rows}</div>`));
+  }
 
   document.getElementById('cards').innerHTML = cards.join('');
 }

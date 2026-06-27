@@ -105,6 +105,13 @@ async function main() {
     return;
   }
 
+  // Append this run's REAL actions to the persisted history (newest first, last 10).
+  if (cfg.controlEnabled && actions.length) {
+    const ts = new Date().toISOString();
+    for (const text of actions) st.history.unshift({ ts, soc: decisions.soc, text });
+    st.history = st.history.slice(0, 10);
+  }
+
   const status = {
     updatedAt: new Date().toISOString(),
     controlEnabled: cfg.controlEnabled,
@@ -121,6 +128,7 @@ async function main() {
       ownership: { mspa: st.mspa.ownedByAuto, ac: st.ac.ownedByAuto },
     },
     actions,
+    history: st.history,
   };
 
   await store.publish(state.serialize(st), JSON.stringify(status, null, 2) + '\n');

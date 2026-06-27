@@ -20,6 +20,7 @@ function defaults() {
     },
     cache: { ts: 0, mspa: null, ac: null },  // throttled spa/AC readings (see index.js)
     lastSoc: null,                            // last SOC we persisted (commit-on-change gate)
+    history: [],                              // last N real actions: { ts, soc, text }
     updatedAt: 0,
   };
 }
@@ -34,6 +35,7 @@ function parse(raw) {
     ac:   { ...defaultDevice(), ...(o.ac || {}) },
     filtration: { ...defaults().filtration, ...(o.filtration || {}) },
     cache: { ...defaults().cache, ...(o.cache || {}) },
+    history: Array.isArray(o.history) ? o.history : [],
   };
 }
 

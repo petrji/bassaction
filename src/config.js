@@ -59,10 +59,12 @@ module.exports = {
   // the device clouds). SOC itself always comes fresh from the ESP push.
   deviceReadMs: num('READ_INTERVAL_MIN', 5) * 60 * 1000,
 
+  // Defaults can be overridden per-deployment with repo Variables of the same
+  // name (no code change needed). Start high (95%) for now; tune later.
   soc: {
-    mspaStart: num('MSPA_SOC_START', 70),
+    mspaStart: num('MSPA_SOC_START', 95),
     mspaStop:  num('MSPA_SOC_STOP',  60),
-    acStart:   num('AC_SOC_START',   50),
+    acStart:   num('AC_SOC_START',   95),
     acStop:    num('AC_SOC_STOP',    40),
   },
 
