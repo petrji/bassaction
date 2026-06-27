@@ -31,11 +31,11 @@
   },
   "ac": {
     "ok": true,
-    "on": false,
+    "on": true,
     "mode": "auto",
     "targetTemp": 25,
     "fan": "auto",
-    "indoorTemp": 29,
+    "indoorTemp": 27,
     "outdoorTemp": null
   },
   "devices": {
