@@ -67,9 +67,9 @@ module.exports = {
   // name (no code change needed). Start high (95%) for now; tune later.
   soc: {
     mspaStart: num('MSPA_SOC_START', 95),
-    mspaStop:  num('MSPA_SOC_STOP',  60),
+    mspaStop:  num('MSPA_SOC_STOP',  75),
     acStart:   num('AC_SOC_START',   95),
-    acStop:    num('AC_SOC_STOP',    40),
+    acStop:    num('AC_SOC_STOP',    60),
   },
 
   // Anti-short-cycle and override windows, in milliseconds.
