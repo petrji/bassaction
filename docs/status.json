@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-27T08:32:01.004Z",
+  "updatedAt": "2026-06-27T08:37:59.625Z",
   "controlEnabled": false,
   "localTime": {
     "hour": 10,
@@ -13,7 +13,7 @@
   },
   "mspa": {
     "ok": true,
-    "waterTempC": 30.5,
+    "waterTempC": 31,
     "targetTempC": 34,
     "filter": false,
     "heater": false,
@@ -29,7 +29,7 @@
     "targetTemp": 25,
     "fan": "auto",
     "indoorTemp": 27,
-    "outdoorTemp": 42
+    "outdoorTemp": null
   },
   "automation": {
     "soc": null,
