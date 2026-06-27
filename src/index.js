@@ -28,18 +28,27 @@ async function main() {
   const st = state.parse(await store.loadStateRaw());
   const now = Date.now();
 
-  // SOC drives control and comes fresh from the ESP. The richer SEMS figures
-  // (PV / load / grid / battery power) are INFORMATIONAL only, so we pull them
-  // on a slow cycle and cache them — no control depends on them.
+  // Informational PV/load/grid figures. The ESP fetches these from SEMS (its
+  // residential IP works where GitHub's datacenter IP is geo-blocked) and sends
+  // them in the dispatch payload. We only fall back to a direct GitHub→SEMS pull
+  // when the ESP didn't supply them (and even then SEMS usually rejects CI's IP).
+  const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+  const espExtras = num(process.env.ESP_PV) != null || num(process.env.ESP_LOAD) != null ? {
+    pvPower: num(process.env.ESP_PV), loadPower: num(process.env.ESP_LOAD),
+    gridPower: num(process.env.ESP_GRID), batteryPower: num(process.env.ESP_BATT),
+    charging: process.env.ESP_CHG === '1' || process.env.ESP_CHG === 'true',
+  } : null;
+
   let semsFetched = false;
-  if (cfg.goodwe.enabled && now - (st.semsCache.ts || 0) >= cfg.semsInfoMs) {
+  if (espExtras) {
+    st.semsCache = { ts: now, data: espExtras };
+  } else if (cfg.goodwe.enabled && now - (st.semsCache.ts || 0) >= cfg.semsInfoMs) {
     const s = await safe('goodwe', () => goodwe.getStatus());
     semsFetched = true;
     if (s.ok) {
       st.semsCache = { ts: now, data: {
         pvPower: s.pvPower, loadPower: s.loadPower, gridPower: s.gridPower,
         batteryPower: s.batteryPower, charging: s.charging, energyToday: s.energyToday,
-        semsSoc: s.batterySOC,   // stationName intentionally omitted (public dashboard)
       }};
     } else {
       st.semsCache = { ...st.semsCache, ts: now, error: s.error }; // back off; keep last good extras

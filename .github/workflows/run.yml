@@ -37,6 +37,11 @@ jobs:
         env:
           CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
           SOC_OVERRIDE:         ${{ github.event.client_payload.soc }}
+          ESP_PV:               ${{ github.event.client_payload.pv }}
+          ESP_LOAD:             ${{ github.event.client_payload.load }}
+          ESP_GRID:             ${{ github.event.client_payload.grid }}
+          ESP_BATT:             ${{ github.event.client_payload.batt }}
+          ESP_CHG:              ${{ github.event.client_payload.chg }}
           READ_INTERVAL_MIN:    ${{ vars.READ_INTERVAL_MIN }}
           MSPA_SOC_START:       ${{ vars.MSPA_SOC_START }}
           MSPA_SOC_STOP:        ${{ vars.MSPA_SOC_STOP }}
