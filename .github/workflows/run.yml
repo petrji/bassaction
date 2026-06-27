@@ -1,0 +1,57 @@
+name: BassAction
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 min (UTC; the app localises to Prague itself)
+  workflow_dispatch:          # manual "Run workflow" button
+
+# Don't let two runs overlap (and don't cancel an in-flight one mid-command).
+concurrency:
+  group: bassaction
+  cancel-in-progress: false
+
+permissions:
+  contents: write             # to commit state.json + docs/status.json back
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Run automation
+        env:
+          CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
+          SEMS_ACCOUNT:         ${{ secrets.SEMS_ACCOUNT }}
+          SEMS_PASSWORD:        ${{ secrets.SEMS_PASSWORD }}
+          SEMS_STATION_ID:      ${{ secrets.SEMS_STATION_ID }}
+          MSPA_APP_ID:          ${{ secrets.MSPA_APP_ID }}
+          MSPA_APP_SECRET:      ${{ secrets.MSPA_APP_SECRET }}
+          MSPA_ACCOUNT:         ${{ secrets.MSPA_ACCOUNT }}
+          MSPA_PASS_MD5:        ${{ secrets.MSPA_PASS_MD5 }}
+          MSPA_DEVICE_ID:       ${{ secrets.MSPA_DEVICE_ID }}
+          MSPA_PRODUCT_ID:      ${{ secrets.MSPA_PRODUCT_ID }}
+          TOSHIBA_USER:         ${{ secrets.TOSHIBA_USER }}
+          TOSHIBA_PASS:         ${{ secrets.TOSHIBA_PASS }}
+          TOSHIBA_CLIENT_ID:    ${{ secrets.TOSHIBA_CLIENT_ID }}
+          TOSHIBA_AC_UNIQUE_ID: ${{ secrets.TOSHIBA_AC_UNIQUE_ID }}
+        run: npm start
+
+      - name: Commit state + status
+        run: |
+          git config user.name  "bassaction-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state.json docs/status.json
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "data: update [skip ci]"
+            git push
+          fi

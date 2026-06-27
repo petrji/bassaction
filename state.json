@@ -1,0 +1,25 @@
+{
+  "mspa": {
+    "ownedByAuto": false,
+    "lastKnownOn": false,
+    "lastChangeTs": 0,
+    "lastCmdTs": 0,
+    "overrideUntil": 0
+  },
+  "ac": {
+    "ownedByAuto": false,
+    "lastKnownOn": false,
+    "lastChangeTs": 0,
+    "lastCmdTs": 0,
+    "overrideUntil": 0
+  },
+  "filtration": {
+    "firedDay": {
+      "c1": "",
+      "c2": "",
+      "c3": ""
+    },
+    "active": null
+  },
+  "updatedAt": 1782547837189
+}
