@@ -28,7 +28,7 @@ function pragueNow(now = new Date()) {
 // Manual-change detection and lastKnownOn sync only make sense against a fresh
 // reading; on cached runs we act on our own believed state (dev.lastKnownOn) so
 // SOC-driven start/stop still works every minute without false override trips.
-function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, now, t, actuate, fresh }) {
+function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, reachedTarget, now, t, actuate, fresh }) {
   const commit = (on) => {
     dev.lastKnownOn = on; dev.ownedByAuto = on; dev.lastChangeTs = now; dev.lastCmdTs = now;
   };
@@ -56,6 +56,13 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
       if (actuate) commit(false);
       return { action: 'off', note: 'night force-off' };
     }
+  }
+
+  // Comfort target reached → stop now, regardless of SOC (auto-owned only).
+  if (effOn && dev.ownedByAuto && reachedTarget()) {
+    if (now < dev.lastChangeTs + cfg.minOnMs) return { action: null, note: 'target reached — waiting min-on' };
+    if (actuate) commit(false);
+    return { action: 'off', note: 'target reached → stop' };
   }
 
   const inDayWindow = t.hour >= cfg.dayStartHour && t.hour < cfg.nightOffHour;
@@ -112,7 +119,26 @@ function makePredicates(readings) {
     return { ok: true };
   };
 
-  return { mspaCanStart, acCanStart };
+  // Comfort target reached → stop the device even if SOC is still high.
+  const mspaReachedTarget = () => {
+    if (!mspa || !mspa.ok) return false;
+    return mspa.waterTempC >= mspa.targetTempC;          // spa: stop at/above target
+  };
+
+  const acReachedTarget = () => {
+    if (!ac || !ac.ok || ac.indoorTemp == null) return false;
+    const m = cfg.acStopMarginC;
+    if (ac.mode === 'cool' || ac.mode === 'dry') return ac.indoorTemp <= ac.targetTemp - m;
+    if (ac.mode === 'heat') return ac.indoorTemp >= ac.targetTemp + m;
+    if (ac.mode === 'auto') {                            // infer direction from current temp
+      if (ac.indoorTemp > ac.targetTemp) return ac.indoorTemp <= ac.targetTemp - m;
+      if (ac.indoorTemp < ac.targetTemp) return ac.indoorTemp >= ac.targetTemp + m;
+      return true;                                       // exactly at target
+    }
+    return false;                                        // fan: no temperature goal
+  };
+
+  return { mspaCanStart, acCanStart, mspaReachedTarget, acReachedTarget };
 }
 
 // Decide filtration. Returns { start?: {ozone,uvc}, stopOzone?, stop?, note }.
@@ -161,7 +187,7 @@ function evaluateFiltration({ fstate, mspa, t, now, actuate, fresh }) {
 
 function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled, fresh = true) {
   const t = pragueNow(new Date(now));
-  const { mspaCanStart, acCanStart } = makePredicates(readings);
+  const { mspaCanStart, acCanStart, mspaReachedTarget, acReachedTarget } = makePredicates(readings);
   const soc = readings.goodwe && readings.goodwe.ok ? readings.goodwe.batterySOC : null;
 
   const decisions = { time: t, soc, devicesFresh: fresh, mspaHeater: null, ac: null, filtration: null };
@@ -170,13 +196,15 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
     if (readings.mspa && readings.mspa.ok) {
       decisions.mspaHeater = evaluateDevice({
         name: 'mspaHeater', dev: state.mspa, actualOn: readings.mspa.heater,
-        soc, socStart: cfg.soc.mspaStart, socStop: cfg.soc.mspaStop, canStart: mspaCanStart, now, t, actuate, fresh,
+        soc, socStart: cfg.soc.mspaStart, socStop: cfg.soc.mspaStop,
+        canStart: mspaCanStart, reachedTarget: mspaReachedTarget, now, t, actuate, fresh,
       });
     }
     if (readings.ac && readings.ac.ok) {
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
-        soc, socStart: cfg.soc.acStart, socStop: cfg.soc.acStop, canStart: acCanStart, now, t, actuate, fresh,
+        soc, socStart: cfg.soc.acStart, socStop: cfg.soc.acStop,
+        canStart: acCanStart, reachedTarget: acReachedTarget, now, t, actuate, fresh,
       });
     }
   } else {

@@ -80,6 +80,7 @@ module.exports = {
   dayStartHour:  7,   // earliest auto-start (Prague local hour)
   nightOffHour: 22,   // 10 PM — force auto-started devices off
   mspaTempMargin: 0.5, // only start heater if water is at least this far below target
+  acStopMarginC: 1.0,  // AC stops on overshoot: cool→target−1°C, heat→target+1°C
 
   // Scheduled MSpa filtration (independent of solar). Each cycle fires once per
   // qualifying day when the run lands on/after its hour and it hasn't run yet.
