@@ -52,7 +52,8 @@ async function main() {
     g = { ok: true, source: 'esp-local', batterySOC: Number(socOverride), online: true,
           pvPower: extras.pvPower ?? null, loadPower: extras.loadPower ?? null,
           gridPower: extras.gridPower ?? null, batteryPower: extras.batteryPower ?? null,
-          charging: extras.charging ?? null, energyToday: extras.energyToday ?? null };
+          charging: extras.charging ?? null, energyToday: extras.energyToday ?? null,
+          semsError: st.semsCache.error || null };  // diagnostic: why SEMS extras are blank
   } else if (extras.semsSoc != null) {
     g = { ok: true, source: 'sems', batterySOC: extras.semsSoc, online: true, ...extras };
   } else {
