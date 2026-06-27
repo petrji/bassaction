@@ -159,6 +159,23 @@ async function main() {
     },
     actions,
     history: st.history,
+    rules: {
+      socStart:    { mspa: cfg.soc.mspaStart, ac: cfg.soc.acStart },
+      socStop:     { mspa: cfg.soc.mspaStop,  ac: cfg.soc.acStop  },
+      mspaTempMargin: cfg.mspaTempMargin,
+      acStopMarginC:  cfg.acStopMarginC,
+      dayStartHour:   cfg.dayStartHour,
+      nightOffHour:   cfg.nightOffHour,
+      minOnMin:    Math.round(cfg.minOnMs / 60000),
+      minOffMin:   Math.round(cfg.minOffMs / 60000),
+      overrideHr:  Math.round(cfg.overrideMs / 3600000),
+      acPriorityBlockC: cfg.acPriorityBlockC,
+      acPriorityClearC: cfg.acPriorityClearC,
+      filtration: cfg.filtration.map((c) => ({
+        key: c.key, hour: c.hour, minutes: c.minutes,
+        ozone: c.ozone, weekdaysOnly: c.weekdaysOnly,
+      })),
+    },
   };
 
   await store.publish(state.serialize(st), JSON.stringify(status, null, 2) + '\n');

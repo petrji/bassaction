@@ -19,6 +19,7 @@
           display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
   .card h2 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
+  .card.rules { grid-column:1 / -1; }
   .row { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; border-top:1px solid var(--line); }
   .row:first-of-type { border-top:0; }
   .k { color:var(--dim); }
@@ -142,6 +143,27 @@ function render(s) {
       return `${t}${soc} — ${h.text}`;
     }).join('\n');
     cards.push(card('🕘 History (last 10)', `<div class="actions">${rows}</div>`));
+  }
+
+  // Rules (the active config the engine is running — single source of truth)
+  const r = s.rules;
+  if (r) {
+    const filt = (r.filtration || []).map(c => {
+      const hh = String(c.hour).padStart(2,'0');
+      const what = c.ozone ? 'filter + UVC + ozone' : 'filter + UVC';
+      const days = c.weekdaysOnly ? 'weekdays' : 'daily';
+      return `${hh}:00 · ${c.minutes} min · ${what} · ${days}`;
+    }).join('\n');
+    cards.push(`<div class="card rules"><h2>📜 Rules (live config)</h2>` +
+      row('Spa heat', `start ≥ ${r.socStart.mspa}% SOC · stop ≤ ${r.socStop.mspa}% or water ≥ target`) +
+      row('Aircon', `start ≥ ${r.socStart.ac}% SOC · stop ≤ ${r.socStop.ac}% or ${r.acStopMarginC}° past target`) +
+      row('Heater start gap', `only if water ≥ ${r.mspaTempMargin}° below target`) +
+      row('Daytime window', `${String(r.dayStartHour).padStart(2,'0')}:00–${String(r.nightOffHour).padStart(2,'0')}:00 · auto-off at night`) +
+      row('Anti-cycle', `min ${r.minOnMin} min on · ${r.minOffMin} min off`) +
+      row('Manual override', `pauses auto for ${r.overrideHr} h after you touch a device`) +
+      row('AC priority', `blocks spa heater when room ≥ ${r.acPriorityBlockC}° over AC target`) +
+      `<div class="row"><span class="k">Filtration cycles</span></div><div class="actions">${filt||'—'}</div>` +
+      `</div>`);
   }
 
   document.getElementById('cards').innerHTML = cards.join('');
