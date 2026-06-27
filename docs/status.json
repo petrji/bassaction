@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-27T08:10:37.190Z",
+  "updatedAt": "2026-06-27T08:32:01.004Z",
   "controlEnabled": false,
   "localTime": {
     "hour": 10,
@@ -8,49 +8,39 @@
     "isWeekday": false
   },
   "solar": {
-    "ok": true,
-    "batterySOC": 62,
-    "pvPower": 2450.16,
-    "batteryPower": 1315,
-    "charging": true,
-    "loadPower": 1130.16,
-    "gridPower": 5,
-    "energyToday": 4.5,
-    "stationName": "Jirousek, Praha",
-    "online": true
+    "ok": false,
+    "error": "Email or password error."
   },
   "mspa": {
     "ok": true,
     "waterTempC": 30.5,
     "targetTempC": 34,
-    "filter": true,
+    "filter": false,
     "heater": false,
     "ozone": false,
-    "uvc": true,
-    "bubble": true,
+    "uvc": false,
+    "bubble": false,
     "online": true
   },
   "ac": {
     "ok": true,
-    "on": false,
+    "on": true,
     "mode": "auto",
     "targetTemp": 25,
     "fan": "auto",
-    "indoorTemp": 29,
-    "outdoorTemp": null
+    "indoorTemp": 27,
+    "outdoorTemp": 42
   },
   "automation": {
-    "soc": 62,
-    "mspaHeater": {
-      "action": null,
-      "note": "hold"
-    },
-    "ac": {
-      "action": "on",
-      "note": "start (SOC 62% ≥ 50%)"
-    },
+    "soc": null,
+    "mspaHeater": null,
+    "ac": null,
     "filtration": {
-      "note": "filtration c2 due but bubbles on"
+      "start": {
+        "ozone": true,
+        "uvc": true
+      },
+      "note": "filtration c2 start (120 min, ozone=true)"
     },
     "ownership": {
       "mspa": false,
@@ -58,6 +48,8 @@
     }
   },
   "actions": [
-    "[dry-run] AC → on"
+    "[dry-run] filtration filter ON",
+    "[dry-run] filtration UVC ON",
+    "[dry-run] filtration ozone ON"
   ]
 }
