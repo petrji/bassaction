@@ -133,6 +133,8 @@ async function main() {
 
   const status = {
     updatedAt: new Date().toISOString(),
+    version: process.env.GIT_SHA || null,        // deployed commit (short SHA)
+    deployedAt: process.env.GIT_TIME || null,    // that commit's timestamp
     controlEnabled: cfg.controlEnabled,
     localTime: decisions.time,
     solar: g,

@@ -42,7 +42,7 @@
   <div class="sub" id="updated">loading…</div>
 </header>
 <div class="wrap" id="cards"></div>
-<footer>Auto-refreshes every 60 s · read-only · data via GitHub Actions</footer>
+<footer id="foot">Auto-refreshes every 60 s · read-only · data via GitHub Actions</footer>
 
 <script>
 const $ = (h) => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
@@ -63,6 +63,11 @@ function render(s) {
     'Updated ' + new Date(s.updatedAt).toLocaleString() +
     (s.localTime ? `  ·  Prague ${String(s.localTime.hour).padStart(2,'0')}:00` : '') +
     (devTxt ? '  ' + devTxt : '');
+
+  const ver = s.version ? `v${s.version}` : '';
+  const dep = s.deployedAt ? `deployed ${new Date(s.deployedAt).toLocaleString()}` : '';
+  document.getElementById('foot').textContent =
+    ['Auto-refreshes every 60 s · read-only', ver, dep].filter(Boolean).join(' · ');
   const mode = document.getElementById('mode');
   mode.textContent = s.controlEnabled ? 'CONTROL ON' : 'read-only';
   mode.className = 'pill ' + (s.controlEnabled ? 'on' : 'dim');

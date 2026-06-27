@@ -28,6 +28,11 @@ jobs:
 
       - run: npm install --no-audit --no-fund
 
+      - name: Capture deployed version
+        run: |
+          echo "GIT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "GIT_TIME=$(git log -1 --format=%cI)" >> "$GITHUB_ENV"
+
       - name: Run automation
         env:
           CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
