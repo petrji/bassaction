@@ -119,6 +119,12 @@ async function main() {
     await run('filtration filter OFF', () => mspa.setFilter(false));
   }
 
+  // Turning the heater on implicitly starts the spa filter, so when the heater
+  // auto-stops, stop the filter too — UNLESS a scheduled filtration cycle is
+  // running, in which case keep filtering. (f.stop already handles its own off.)
+  if (decisions.mspaHeater && decisions.mspaHeater.action === 'off' && !st.filtration.active && !f.stop)
+    await run('heater stopped → filter OFF', () => mspa.setFilter(false));
+
   // 3b. Confirm: if we actually changed a device, re-read JUST that device so the
   //     dashboard reflects the new state immediately instead of lagging a full
   //     read interval. These commands fire only a few times a day, so the extra

@@ -158,6 +158,7 @@ function render(s) {
       row('Spa heat', `start ≥ ${r.socStart.mspa}% SOC · stop ≤ ${r.socStop.mspa}% or water ≥ target`) +
       row('Aircon', `start ≥ ${r.socStart.ac}% SOC · stop ≤ ${r.socStop.ac}% wkday${r.socStop.acWeekend!=null?` / ${r.socStop.acWeekend}% wkend`:''} or ${r.acStopMarginC}° past target`) +
       row('Heater start gap', `only if water ≥ ${r.mspaTempMargin}° below target`) +
+      row('Filter cleanup', `when heater auto-stops, filter stops too — unless a filtration cycle is running`) +
       row('Daytime window', `${String(r.dayStartHour).padStart(2,'0')}:00–${String(r.nightOffHour).padStart(2,'0')}:00 · auto-off at night`) +
       row('Anti-cycle', `min ${r.minOnMin} min on · ${r.minOffMin} min off`) +
       row('Manual override', `pauses auto for ${r.overrideHr} h after you touch a device`) +
