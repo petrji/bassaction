@@ -92,7 +92,7 @@ module.exports = {
   // Scheduled MSpa filtration (independent of solar). Each cycle fires once per
   // qualifying day when the run lands on/after its hour and it hasn't run yet.
   filtration: [
-    { key: 'c1', hour: 23, minutes: 120, ozone: true,  weekdaysOnly: false }, // 11 PM full
+    { key: 'c1', hour: 22, minutes: 120, ozone: true,  weekdaysOnly: false }, // 10 PM full
     { key: 'c2', hour: 6,  minutes: 120, ozone: true,  weekdaysOnly: false }, // 6 AM full
     { key: 'c3', hour: 13, minutes: 90,  ozone: false, weekdaysOnly: true  }, // 1 PM filter+UVC, weekdays
   ],
