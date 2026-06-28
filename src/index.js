@@ -119,6 +119,27 @@ async function main() {
     await run('filtration filter OFF', () => mspa.setFilter(false));
   }
 
+  // 3b. Confirm: if we actually changed a device, re-read JUST that device so the
+  //     dashboard reflects the new state immediately instead of lagging a full
+  //     read interval. These commands fire only a few times a day, so the extra
+  //     cloud reads are negligible. A short settle lets the cloud apply the change
+  //     before we read it back (same reason settleMs guards manual detection).
+  if (cfg.controlEnabled) {
+    const mspaTouched = (decisions.mspaHeater && decisions.mspaHeater.action) || f.start || f.stop || f.stopOzone;
+    const acTouched   = decisions.ac && decisions.ac.action;
+    if (mspaTouched || acTouched) {
+      await new Promise((r) => setTimeout(r, 5000)); // settle for cloud propagation
+      if (mspaTouched) {
+        const m2 = await safe('mspa', () => mspa.getState());
+        if (m2.ok) { m = m2; st.cache = { ...st.cache, ts: now, mspa: m2 }; }
+      }
+      if (acTouched) {
+        const a2 = await safe('toshiba', () => toshiba.getState());
+        if (a2.ok) { a = a2; st.cache = { ...st.cache, ts: now, ac: a2 }; }
+      }
+    }
+  }
+
   // 4. Persist + publish — but only when something worth recording changed, so a
   //    1-minute cadence doesn't commit ~1400 near-identical files/day. A fresh
   //    device read, any action, a SOC change, or a filtration event all qualify;
