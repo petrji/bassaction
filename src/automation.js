@@ -201,9 +201,11 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
       });
     }
     if (readings.ac && readings.ac.ok) {
+      // Weekends: AC stops at a higher SOC floor so the spa gets the battery tail.
+      const acStop = t.isWeekday ? cfg.soc.acStop : cfg.soc.acStopWeekend;
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
-        soc, socStart: cfg.soc.acStart, socStop: cfg.soc.acStop,
+        soc, socStart: cfg.soc.acStart, socStop: acStop,
         canStart: acCanStart, reachedTarget: acReachedTarget, now, t, actuate, fresh,
       });
     }

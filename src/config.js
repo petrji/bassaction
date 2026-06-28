@@ -70,6 +70,9 @@ module.exports = {
     mspaStop:  num('MSPA_SOC_STOP',  75),
     acStart:   num('AC_SOC_START',   95),
     acStop:    num('AC_SOC_STOP',    60),
+    // Weekends: stop the AC earlier (higher floor) so the battery tail goes to
+    // the spa, not the (mostly empty) office. AC start is unchanged.
+    acStopWeekend: num('AC_SOC_STOP_WEEKEND', 80),
   },
 
   // Anti-short-cycle and override windows, in milliseconds.

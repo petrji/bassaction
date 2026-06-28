@@ -182,7 +182,7 @@ async function main() {
     history: st.history,
     rules: {
       socStart:    { mspa: cfg.soc.mspaStart, ac: cfg.soc.acStart },
-      socStop:     { mspa: cfg.soc.mspaStop,  ac: cfg.soc.acStop  },
+      socStop:     { mspa: cfg.soc.mspaStop,  ac: cfg.soc.acStop, acWeekend: cfg.soc.acStopWeekend },
       mspaTempMargin: cfg.mspaTempMargin,
       acStopMarginC:  cfg.acStopMarginC,
       dayStartHour:   cfg.dayStartHour,
