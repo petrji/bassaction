@@ -57,7 +57,9 @@ function card(title, rowsHtml) {
 }
 function row(k, v) { return `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
 
+let lastStatus = null;
 function render(s) {
+  lastStatus = s;
   const dev = s.devices || {};
   const devTxt = dev.fresh ? '· spa/AC: live' : (dev.ageSec != null ? `· spa/AC: cached ${Math.round(dev.ageSec/60)}m` : '');
   document.getElementById('updated').textContent =
@@ -65,8 +67,12 @@ function render(s) {
     (s.localTime ? `  ·  Prague ${String(s.localTime.hour).padStart(2,'0')}:00` : '') +
     (devTxt ? '  ' + devTxt : '');
 
-  const ver = s.version ? `v${s.version}` : '';
-  const dep = s.deployedAt ? `deployed ${new Date(s.deployedAt).toLocaleString()}` : '';
+  // "deployed" = the code currently on main (when you last pushed), read directly
+  // from the latest commit so it updates the moment Pages serves this page — not
+  // when the next workflow cycle runs. Falls back to status.json if the API fails.
+  const ver = codeDeploy ? `v${codeDeploy.sha}` : (s.version ? `v${s.version}` : '');
+  const depDate = (codeDeploy && codeDeploy.date) || s.deployedAt;
+  const dep = depDate ? `deployed ${new Date(depDate).toLocaleString()}` : '';
   document.getElementById('foot').textContent =
     ['Auto-refreshes every 60 s · read-only', ver, dep].filter(Boolean).join(' · ');
   const mode = document.getElementById('mode');
@@ -185,7 +191,21 @@ async function load() {
     document.getElementById('updated').innerHTML = '<span class="err">No status yet — waiting for the first run.</span>';
   }
 }
+
+// Latest commit on main → the real "deployed" time. Fetched ONCE per page load
+// (not on the 60s refresh) to stay well under the unauthenticated API limit.
+let codeDeploy = null; // { sha, date }
+async function loadDeploy() {
+  try {
+    const r = await fetch('https://api.github.com/repos/petrji/bassaction/commits/main', { cache: 'no-store' });
+    const c = await r.json();
+    codeDeploy = { sha: (c.sha || '').slice(0, 7), date: c.commit && c.commit.committer && c.commit.committer.date };
+    if (lastStatus) render(lastStatus); // refresh the footer with the real deploy time
+  } catch (e) { /* keep the status.json fallback */ }
+}
+
 load();
+loadDeploy();
 setInterval(load, 60000);
 </script>
 </body>
