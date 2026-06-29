@@ -12,6 +12,7 @@ function pragueNow(now = new Date()) {
   const d = String(local.getDate()).padStart(2, '0');
   return {
     hour: local.getHours(),
+    minute: local.getMinutes(),
     weekday: local.getDay(),           // 0=Sun .. 6=Sat
     dateKey: `${y}-${m}-${d}`,
     isWeekday: local.getDay() >= 1 && local.getDay() <= 5,
@@ -28,7 +29,7 @@ function pragueNow(now = new Date()) {
 // Manual-change detection and lastKnownOn sync only make sense against a fresh
 // reading; on cached runs we act on our own believed state (dev.lastKnownOn) so
 // SOC-driven start/stop still works every minute without false override trips.
-function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, reachedTarget, now, t, actuate, fresh }) {
+function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart, reachedTarget, now, t, actuate, fresh, ignoreSoc = false }) {
   const commit = (on) => {
     dev.lastKnownOn = on; dev.ownedByAuto = on; dev.lastChangeTs = now; dev.lastCmdTs = now;
   };
@@ -66,16 +67,21 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
   }
 
   const inDayWindow = t.hour >= cfg.dayStartHour && t.hour < cfg.nightOffHour;
-  const wantOn  = inDayWindow && soc >= socStart && canStart().ok;
-  const wantOff = soc <= socStop;
+  // ignoreSoc (hot-day pre-cool): run on the thermostat alone, no SOC gate either way.
+  const socOkToStart = ignoreSoc || soc >= socStart;
+  const wantOn  = inDayWindow && socOkToStart && canStart().ok;
+  const wantOff = !ignoreSoc && soc <= socStop;
 
-  // 4. Turn ON (only in the day window, above start SOC, device-specific ok).
+  // 4. Turn ON (in the day window, SOC ok or forecast-hot, device-specific ok).
   if (!effOn && wantOn) {
     if (now < dev.lastChangeTs + cfg.minOffMs) return { action: null, note: 'min-off not elapsed' };
     if (actuate) commit(true);
-    return { action: 'on', note: `start (SOC ${soc}% ≥ ${socStart}%)` };
+    const note = (ignoreSoc && soc < socStart)
+      ? `start (hot-day forecast pre-cool, SOC ${soc}%)`
+      : `start (SOC ${soc}% ≥ ${socStart}%)`;
+    return { action: 'on', note };
   }
-  if (!effOn && inDayWindow && soc >= socStart && !canStart().ok) {
+  if (!effOn && inDayWindow && socOkToStart && !canStart().ok) {
     return { action: null, note: `start blocked: ${canStart().reason}` };
   }
 
@@ -203,10 +209,16 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
     if (readings.ac && readings.ac.ok) {
       // Weekends: AC stops at a higher SOC floor so the spa gets the battery tail.
       const acStop = t.isWeekday ? cfg.soc.acStop : cfg.soc.acStopWeekend;
+      // Hot-day pre-cool: forecast max ≥ threshold AND past the early time → the
+      // AC ignores SOC entirely and runs on the thermostat (battery-independent).
+      const fcMax = readings.forecast && readings.forecast.maxTempC;
+      const pastEarly = t.hour > cfg.acEarlyHour || (t.hour === cfg.acEarlyHour && t.minute >= cfg.acEarlyMin);
+      const acIgnoreSoc = fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
         soc, socStart: cfg.soc.acStart, socStop: acStop,
         canStart: acCanStart, reachedTarget: acReachedTarget, now, t, actuate, fresh,
+        ignoreSoc: acIgnoreSoc,
       });
     }
   } else {

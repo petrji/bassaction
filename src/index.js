@@ -12,6 +12,7 @@ const { decide } = require('./automation');
 const goodwe = require('./goodwe');
 const mspa = require('./mspa');
 const toshiba = require('./toshiba');
+const forecast = require('./forecast');
 
 async function safe(label, fn) {
   try { return { ok: true, ...(await fn()) }; }
@@ -56,6 +57,19 @@ async function main() {
   }
   const extras = st.semsCache.data || {};
 
+  // Daily weather forecast (Open-Meteo), refreshed every few hours and cached in
+  // state. Drives the hot-day AC pre-cool. Best-effort: a failure keeps the last
+  // value and never blocks the run.
+  let forecastFetched = false;
+  if (now - (st.forecastCache.ts || 0) >= cfg.forecast.refreshMs) {
+    const fc = await safe('forecast', () => forecast.getDaily());
+    forecastFetched = true;
+    st.forecastCache = (fc.ok && fc.maxTempC != null)
+      ? { ts: now, data: { maxTempC: fc.maxTempC } }
+      : { ...st.forecastCache, ts: now }; // back off; keep last good value
+  }
+  const forecastData = st.forecastCache.data || null;
+
   let g;
   if (haveEspSoc) {
     g = { ok: true, source: 'esp-local', batterySOC: Number(socOverride), online: true,
@@ -87,7 +101,7 @@ async function main() {
     m = st.cache.mspa;
     a = st.cache.ac;
   }
-  const readings = { goodwe: g, mspa: m, ac: a };
+  const readings = { goodwe: g, mspa: m, ac: a, forecast: forecastData };
 
   // 2. Decide.
   const decisions = decide(readings, st, now, cfg.controlEnabled, devicesFresh);
@@ -154,7 +168,7 @@ async function main() {
   const socChanged = decisions.soc != null && decisions.soc !== st.lastSoc;
   if (decisions.soc != null) st.lastSoc = decisions.soc;
   const realAction = cfg.controlEnabled && (actions.length > 0 || f2.start || f2.stop || f2.stopOzone);
-  const meaningful = devicesFresh || socChanged || semsFetched || !!realAction;
+  const meaningful = devicesFresh || socChanged || semsFetched || forecastFetched || !!realAction;
   if (!meaningful) {
     console.log('no meaningful change since last run — skipping write');
     return;
@@ -198,6 +212,11 @@ async function main() {
       overrideHr:  Math.round(cfg.overrideMs / 3600000),
       acPriorityBlockC: cfg.acPriorityBlockC,
       acPriorityClearC: cfg.acPriorityClearC,
+      acHotForecast: {
+        thresholdC: cfg.acHotForecastC,
+        from: `${String(cfg.acEarlyHour).padStart(2, '0')}:${String(cfg.acEarlyMin).padStart(2, '0')}`,
+        todayMaxC: forecastData ? forecastData.maxTempC : null,
+      },
       filtration: cfg.filtration.map((c) => ({
         key: c.key, hour: c.hour, minutes: c.minutes,
         ozone: c.ozone, weekdaysOnly: c.weekdaysOnly,

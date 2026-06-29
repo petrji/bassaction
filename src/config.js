@@ -89,6 +89,20 @@ module.exports = {
   mspaTempMargin: 0.5, // only start heater if water is at least this far below target
   acStopMarginC: 1.0,  // AC stops on overshoot: cool→target−1°C, heat→target+1°C
 
+  // ── Weather-forecast pre-cool (Open-Meteo, Praha-Libuš by default) ──
+  // On a hot day, run the AC early regardless of battery: if today's forecast
+  // max temperature ≥ acHotForecastC, from acEarly* the AC ignores SOC entirely
+  // and runs on the thermostat alone (still stops at comfort target / 22:00 /
+  // manual touch). Normal days are unaffected.
+  forecast: {
+    lat:       num('FORECAST_LAT', 50.007),   // Praha-Libuš
+    lon:       num('FORECAST_LON', 14.446),
+    refreshMs: num('FORECAST_INTERVAL_MIN', 180) * 60 * 1000, // re-pull every 3 h
+  },
+  acHotForecastC: num('AC_HOT_FORECAST_C', 30), // forecast max ≥ this → pre-cool
+  acEarlyHour:    num('AC_EARLY_HOUR', 7),
+  acEarlyMin:     num('AC_EARLY_MIN', 30),       // …from 07:30
+
   // Scheduled MSpa filtration (independent of solar). Each cycle fires once per
   // qualifying day when the run lands on/after its hour and it hasn't run yet.
   filtration: [
