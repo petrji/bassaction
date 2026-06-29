@@ -57,6 +57,23 @@ function card(title, rowsHtml) {
 }
 function row(k, v) { return `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
 
+// WMO weather code → emoji + label (Open-Meteo).
+function wmo(code) {
+  const m = {
+    0:['☀️','Clear'], 1:['🌤️','Mainly clear'], 2:['⛅','Partly cloudy'], 3:['☁️','Overcast'],
+    45:['🌫️','Fog'], 48:['🌫️','Rime fog'],
+    51:['🌦️','Light drizzle'], 53:['🌦️','Drizzle'], 55:['🌦️','Heavy drizzle'],
+    61:['🌧️','Light rain'], 63:['🌧️','Rain'], 65:['🌧️','Heavy rain'],
+    66:['🌧️','Freezing rain'], 67:['🌧️','Freezing rain'],
+    71:['🌨️','Light snow'], 73:['🌨️','Snow'], 75:['🌨️','Heavy snow'], 77:['🌨️','Snow grains'],
+    80:['🌦️','Light showers'], 81:['🌦️','Showers'], 82:['⛈️','Violent showers'],
+    85:['🌨️','Snow showers'], 86:['🌨️','Snow showers'],
+    95:['⛈️','Thunderstorm'], 96:['⛈️','Thunderstorm w/ hail'], 99:['⛈️','Thunderstorm w/ hail'],
+  };
+  const e = m[code];
+  return { emoji: e ? e[0] : '🌡️', text: e ? e[1] : '—' };
+}
+
 let lastStatus = null;
 function render(s) {
   lastStatus = s;
@@ -97,6 +114,16 @@ function render(s) {
       row('Today', n(g.energyToday,' kWh',1))));
   } else {
     cards.push(card('☀️ Solar / Battery', `<div class="err">${g.error||'unavailable'}</div>`));
+  }
+
+  // Weather (Open-Meteo · Praha-Libuš)
+  const w = s.weather;
+  if (w && (w.currentTempC != null || w.maxTempC != null)) {
+    const cond = wmo(w.weatherCode);
+    cards.push(card(`${cond.emoji} Weather · Libuš`,
+      (w.currentTempC != null ? `<div class="big">${n(w.currentTempC,'°',1)}</div>` : '') +
+      row('Now', cond.text) +
+      row('Today', `${n(w.maxTempC,'°',0)} high · ${n(w.minTempC,'°',0)} low`)));
   }
 
   // MSpa

@@ -65,7 +65,7 @@ async function main() {
     const fc = await safe('forecast', () => forecast.getDaily());
     forecastFetched = true;
     st.forecastCache = (fc.ok && fc.maxTempC != null)
-      ? { ts: now, data: { maxTempC: fc.maxTempC } }
+      ? { ts: now, data: { maxTempC: fc.maxTempC, minTempC: fc.minTempC, currentTempC: fc.currentTempC, weatherCode: fc.weatherCode } }
       : { ...st.forecastCache, ts: now }; // back off; keep last good value
   }
   const forecastData = st.forecastCache.data || null;
@@ -188,6 +188,7 @@ async function main() {
     controlEnabled: cfg.controlEnabled,
     localTime: decisions.time,
     solar: g,
+    weather: forecastData,
     mspa: m,
     ac: a,
     devices: { fresh: devicesFresh, ageSec: Math.round((now - st.cache.ts) / 1000) },
