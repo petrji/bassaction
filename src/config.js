@@ -97,7 +97,7 @@ module.exports = {
   forecast: {
     lat:       num('FORECAST_LAT', 49.991),   // Praha-Písnice
     lon:       num('FORECAST_LON', 14.460),
-    refreshMs: num('FORECAST_INTERVAL_MIN', 180) * 60 * 1000, // re-pull every 3 h
+    refreshMs: num('FORECAST_INTERVAL_MIN', 15) * 60 * 1000, // re-pull every 15 min (current temp tracks)
   },
   acHotForecastC: num('AC_HOT_FORECAST_C', 30), // forecast max ≥ this → pre-cool
   acEarlyHour:    num('AC_EARLY_HOUR', 7),
