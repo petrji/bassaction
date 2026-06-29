@@ -209,11 +209,12 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
     if (readings.ac && readings.ac.ok) {
       // Weekends: AC stops at a higher SOC floor so the spa gets the battery tail.
       const acStop = t.isWeekday ? cfg.soc.acStop : cfg.soc.acStopWeekend;
-      // Hot-day pre-cool: forecast max ≥ threshold AND past the early time → the
-      // AC ignores SOC entirely and runs on the thermostat (battery-independent).
+      // Hot-day pre-cool (WEEKDAYS only — office empty on weekends, so weekends
+      // always wait for battery): forecast max ≥ threshold AND past the early time
+      // → the AC ignores SOC entirely and runs on the thermostat.
       const fcMax = readings.forecast && readings.forecast.maxTempC;
       const pastEarly = t.hour > cfg.acEarlyHour || (t.hour === cfg.acEarlyHour && t.minute >= cfg.acEarlyMin);
-      const acIgnoreSoc = fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
+      const acIgnoreSoc = t.isWeekday && fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
         soc, socStart: cfg.soc.acStart, socStop: acStop,
