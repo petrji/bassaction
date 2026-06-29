@@ -61,7 +61,10 @@ async function main() {
   // state. Drives the hot-day AC pre-cool. Best-effort: a failure keeps the last
   // value and never blocks the run.
   let forecastFetched = false;
-  if (now - (st.forecastCache.ts || 0) >= cfg.forecast.refreshMs) {
+  // Refetch on the normal cadence, OR immediately if the cached entry predates the
+  // richer shape (only had maxTempC) so current/low aren't stuck showing "—".
+  const fcShapeOld = st.forecastCache.data && !('currentTempC' in st.forecastCache.data);
+  if (fcShapeOld || now - (st.forecastCache.ts || 0) >= cfg.forecast.refreshMs) {
     const fc = await safe('forecast', () => forecast.getDaily());
     forecastFetched = true;
     st.forecastCache = (fc.ok && fc.maxTempC != null)

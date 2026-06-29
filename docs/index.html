@@ -120,7 +120,7 @@ function render(s) {
   const w = s.weather;
   if (w && (w.currentTempC != null || w.maxTempC != null)) {
     const cond = wmo(w.weatherCode);
-    cards.push(card(`${cond.emoji} Weather · Libuš`,
+    cards.push(card(`${cond.emoji} Weather · Písnice`,
       (w.currentTempC != null ? `<div class="big">${n(w.currentTempC,'°',1)}</div>` : '') +
       row('Now', cond.text) +
       row('Today', `${n(w.maxTempC,'°',0)} high · ${n(w.minTempC,'°',0)} low`)));
