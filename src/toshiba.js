@@ -1,13 +1,16 @@
 'use strict';
-// Toshiba Home AC Control: HTTP login + state read, MQTT (Azure IoT Hub) commands.
-// Ported from the proven Electron module; credentials come from config.
+// Toshiba Home AC Control: HTTP login + state read ONLY.
+//
+// AC start/stop was moved to the ESP (hikvision-stream), which now owns the AC
+// and sends commands locally over MQTT (Azure IoT Hub). The cloud deliberately
+// no longer has any command path — it only reads the AC state for the dashboard,
+// so this module exposes just getState().
 const axios = require('axios');
-const mqtt  = require('mqtt');
 const { toshiba } = require('./config');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-let _token = null, _consumerId = null, _sasToken = null;
+let _token = null, _consumerId = null;
 
 async function login() {
   const res = await axios.post(`${toshiba.base}/api/Consumer/Login`,
@@ -22,16 +25,6 @@ async function login() {
 
 function authHeaders() {
   return { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': UA };
-}
-
-async function registerDevice() {
-  if (!_token) await login();
-  const res = await axios.post(`${toshiba.base}/api/Consumer/RegisterMobileDevice`,
-    { DeviceID: toshiba.clientId, DeviceType: '1', Username: toshiba.user },
-    { headers: authHeaders(), validateStatus: () => true });
-  if (!res.data.IsSuccess) throw new Error(res.data.Message || 'Toshiba register failed');
-  _sasToken = res.data.ResObj.SasToken;
-  return _sasToken;
 }
 
 const MODES = { 0x41: 'auto', 0x42: 'cool', 0x43: 'heat', 0x44: 'dry', 0x45: 'fan' };
@@ -52,37 +45,6 @@ function decodeState(hexState) {
   };
 }
 
-// Only the fields you change; everything else stays 0xFF (ignored).
-function encodeCommand(fields) {
-  const buf = Buffer.alloc(20, 0xff);
-  if (fields.status !== undefined) buf[0] = fields.status;
-  if (fields.mode   !== undefined) buf[1] = fields.mode;
-  if (fields.temp   !== undefined) buf.writeInt8(fields.temp, 2);
-  if (fields.fan    !== undefined) buf[3] = fields.fan;
-  const hex = buf.toString('hex');
-  return hex.slice(0, 12) + hex[13] + hex[15] + hex.slice(16); // Merit A/B nibble compression
-}
-
-function sendMqttCommand(hexCmd) {
-  return new Promise(async (resolve, reject) => {
-    try { if (!_sasToken) await registerDevice(); } catch (e) { return reject(e); }
-    const cmd = {
-      sourceId: toshiba.clientId, messageId: '0000000', targetId: [toshiba.acUniqueId],
-      cmd: 'CMD_FCU_TO_AC', payload: { data: hexCmd }, timeStamp: '0000000',
-    };
-    const topic = `devices/${toshiba.clientId}/messages/events/type=mob&$.ct=application%2Fjson&$.ce=utf-8`;
-    const client = mqtt.connect(`mqtts://${toshiba.iotHost}:8883`, {
-      clientId: toshiba.clientId,
-      username: `${toshiba.iotHost}/${toshiba.clientId}/?api-version=2021-04-12`,
-      password: _sasToken, rejectUnauthorized: true, connectTimeout: 10000, reconnectPeriod: 0,
-    });
-    const done = (err) => { client.end(); err ? reject(err) : resolve(); };
-    client.once('connect', () => client.publish(topic, JSON.stringify(cmd), { qos: 1 }, (err) => done(err)));
-    client.once('error', (err) => done(err));
-    setTimeout(() => done(new Error('MQTT timeout')), 12000);
-  });
-}
-
 async function getState() {
   if (!_token) await login();
   const res = await axios.get(`${toshiba.base}/api/AC/GetConsumerACMapping`,
@@ -93,6 +55,4 @@ async function getState() {
   return decodeState(device.ACStateData);
 }
 
-const setPower = (on) => sendMqttCommand(encodeCommand({ status: on ? 0x30 : 0x31 }));
-
-module.exports = { getState, setPower };
+module.exports = { getState };

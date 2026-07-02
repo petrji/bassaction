@@ -120,8 +120,8 @@ async function main() {
 
   if (decisions.mspaHeater && decisions.mspaHeater.action)
     await run(`MSpa heater → ${decisions.mspaHeater.action}`, () => mspa.setHeater(decisions.mspaHeater.action === 'on'));
-  if (decisions.ac && decisions.ac.action)
-    await run(`AC → ${decisions.ac.action}`, () => toshiba.setPower(decisions.ac.action === 'on'));
+  // AC start/stop is handled locally by the ESP now (see hikvision-stream). The
+  // cloud still reads AC state for the dashboard but never commands it.
 
   const f = decisions.filtration || {};
   if (f.start) {

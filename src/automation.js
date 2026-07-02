@@ -208,26 +208,12 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
         canStart: mspaCanStart, reachedTarget: mspaReachedTarget, now, t, actuate, fresh,
       });
     }
-    if (readings.ac && readings.ac.ok) {
-      // Weekends: AC stops at a higher SOC floor so the spa gets the battery tail.
-      const acStop = t.isWeekday ? cfg.soc.acStop : cfg.soc.acStopWeekend;
-      // Battery-independent AC (WEEKDAYS only — office empty on weekends). Either:
-      //  (a) hot-day forecast: today's max ≥ acHotForecastC AND past acEarly*, or
-      //  (b) it's actually hot indoors: indoor temp ≥ acIndoorHotC.
-      // Then the AC ignores SOC entirely and runs on the thermostat. (Starting is
-      // still capped at noStartAfterHour by evaluateDevice.)
-      const fcMax = readings.forecast && readings.forecast.maxTempC;
-      const pastEarly = t.hour > cfg.acEarlyHour || (t.hour === cfg.acEarlyHour && t.minute >= cfg.acEarlyMin);
-      const forecastHot = fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
-      const indoorHot = readings.ac.indoorTemp != null && readings.ac.indoorTemp >= cfg.acIndoorHotC;
-      const acIgnoreSoc = t.isWeekday && (forecastHot || indoorHot);
-      decisions.ac = evaluateDevice({
-        name: 'ac', dev: state.ac, actualOn: readings.ac.on,
-        soc, socStart: cfg.soc.acStart, socStop: acStop,
-        canStart: acCanStart, reachedTarget: acReachedTarget, now, t, actuate, fresh,
-        ignoreSoc: acIgnoreSoc,
-      });
-    }
+    // AC control has moved to the ESP (local actuation over MQTT). The cloud no
+    // longer decides or commands the AC — it only reads its state for the
+    // dashboard. Relinquish any ownership the cloud still held so it can't claim
+    // the AC, and surface an informational note instead of a decision.
+    if (state.ac) state.ac.ownedByAuto = false;
+    decisions.ac = { action: null, note: 'AC control moved to ESP (local)' };
   } else {
     decisions.note = 'no SOC reading — solar automation skipped this run';
   }

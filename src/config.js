@@ -37,14 +37,14 @@ module.exports = {
     productId: req('MSPA_PRODUCT_ID'),
   },
 
-  // ── Toshiba Home AC Control (cloud + Azure IoT Hub MQTT) ──
+  // ── Toshiba Home AC Control (cloud — READ ONLY) ──
+  // AC start/stop moved to the ESP (local MQTT). The cloud only reads state now,
+  // so it needs just the login creds; CLIENT_ID / AC_UNIQUE_ID / IoT host live on
+  // the ESP and are no longer required here.
   toshiba: {
     base:        'https://mobileapi.toshibahomeaccontrols.com',
-    iotHost:     'toshibasmaciothubprod.azure-devices.net',
     user:        req('TOSHIBA_USER'),
     password:    req('TOSHIBA_PASS'),
-    clientId:    req('TOSHIBA_CLIENT_ID'),
-    acUniqueId:  req('TOSHIBA_AC_UNIQUE_ID'),
   },
 
   // ── Automation tunables (mirrors the ESP firmware) ──
