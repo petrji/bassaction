@@ -102,6 +102,11 @@ module.exports = {
   acHotForecastC: num('AC_HOT_FORECAST_C', 30), // forecast max ≥ this → pre-cool
   acEarlyHour:    num('AC_EARLY_HOUR', 7),
   acEarlyMin:     num('AC_EARLY_MIN', 30),       // …from 07:30
+  acIndoorHotC:   num('AC_INDOOR_HOT_C', 29),    // indoor ≥ this → AC starts ignoring battery (weekdays)
+
+  // Never auto-START a device at/after this hour (Prague local). Running devices
+  // keep running — this only blocks new starts.
+  noStartAfterHour: num('NO_START_AFTER_HOUR', 16),
 
   // Scheduled MSpa filtration (independent of solar). Each cycle fires once per
   // qualifying day when the run lands on/after its hour and it hasn't run yet.

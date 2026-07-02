@@ -221,6 +221,8 @@ async function main() {
         from: `${String(cfg.acEarlyHour).padStart(2, '0')}:${String(cfg.acEarlyMin).padStart(2, '0')}`,
         todayMaxC: forecastData ? forecastData.maxTempC : null,
       },
+      acIndoorHotC: cfg.acIndoorHotC,
+      noStartAfterHour: cfg.noStartAfterHour,
       filtration: cfg.filtration.map((c) => ({
         key: c.key, hour: c.hour, minutes: c.minutes,
         ozone: c.ozone, weekdaysOnly: c.weekdaysOnly,

@@ -66,22 +66,24 @@ function evaluateDevice({ name, dev, actualOn, soc, socStart, socStop, canStart,
     return { action: 'off', note: 'target reached → stop' };
   }
 
-  const inDayWindow = t.hour >= cfg.dayStartHour && t.hour < cfg.nightOffHour;
-  // ignoreSoc (hot-day pre-cool): run on the thermostat alone, no SOC gate either way.
+  // Start window: from dayStartHour until noStartAfterHour (never START after that;
+  // a running device keeps running — night force-off at nightOffHour still applies).
+  const inStartWindow = t.hour >= cfg.dayStartHour && t.hour < cfg.noStartAfterHour;
+  // ignoreSoc (hot-day pre-cool / hot indoor): run on the thermostat alone, no SOC gate.
   const socOkToStart = ignoreSoc || soc >= socStart;
-  const wantOn  = inDayWindow && socOkToStart && canStart().ok;
+  const wantOn  = inStartWindow && socOkToStart && canStart().ok;
   const wantOff = !ignoreSoc && soc <= socStop;
 
-  // 4. Turn ON (in the day window, SOC ok or forecast-hot, device-specific ok).
+  // 4. Turn ON (in the start window, SOC ok or hot-override, device-specific ok).
   if (!effOn && wantOn) {
     if (now < dev.lastChangeTs + cfg.minOffMs) return { action: null, note: 'min-off not elapsed' };
     if (actuate) commit(true);
     const note = (ignoreSoc && soc < socStart)
-      ? `start (hot-day forecast pre-cool, SOC ${soc}%)`
+      ? `start (hot override — SOC ${soc}% ignored)`
       : `start (SOC ${soc}% ≥ ${socStart}%)`;
     return { action: 'on', note };
   }
-  if (!effOn && inDayWindow && socOkToStart && !canStart().ok) {
+  if (!effOn && inStartWindow && socOkToStart && !canStart().ok) {
     return { action: null, note: `start blocked: ${canStart().reason}` };
   }
 
@@ -209,12 +211,16 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
     if (readings.ac && readings.ac.ok) {
       // Weekends: AC stops at a higher SOC floor so the spa gets the battery tail.
       const acStop = t.isWeekday ? cfg.soc.acStop : cfg.soc.acStopWeekend;
-      // Hot-day pre-cool (WEEKDAYS only — office empty on weekends, so weekends
-      // always wait for battery): forecast max ≥ threshold AND past the early time
-      // → the AC ignores SOC entirely and runs on the thermostat.
+      // Battery-independent AC (WEEKDAYS only — office empty on weekends). Either:
+      //  (a) hot-day forecast: today's max ≥ acHotForecastC AND past acEarly*, or
+      //  (b) it's actually hot indoors: indoor temp ≥ acIndoorHotC.
+      // Then the AC ignores SOC entirely and runs on the thermostat. (Starting is
+      // still capped at noStartAfterHour by evaluateDevice.)
       const fcMax = readings.forecast && readings.forecast.maxTempC;
       const pastEarly = t.hour > cfg.acEarlyHour || (t.hour === cfg.acEarlyHour && t.minute >= cfg.acEarlyMin);
-      const acIgnoreSoc = t.isWeekday && fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
+      const forecastHot = fcMax != null && fcMax >= cfg.acHotForecastC && pastEarly;
+      const indoorHot = readings.ac.indoorTemp != null && readings.ac.indoorTemp >= cfg.acIndoorHotC;
+      const acIgnoreSoc = t.isWeekday && (forecastHot || indoorHot);
       decisions.ac = evaluateDevice({
         name: 'ac', dev: state.ac, actualOn: readings.ac.on,
         soc, socStart: cfg.soc.acStart, socStop: acStop,

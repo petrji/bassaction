@@ -191,6 +191,8 @@ function render(s) {
       row('Spa heat', `start ≥ ${r.socStart.mspa}% SOC · stop ≤ ${r.socStop.mspa}% or water ≥ target`) +
       row('Aircon', `start ≥ ${r.socStart.ac}% SOC · stop ≤ ${r.socStop.ac}% wkday${r.socStop.acWeekend!=null?` / ${r.socStop.acWeekend}% wkend`:''} or ${r.acStopMarginC}° past target`) +
       (r.acHotForecast ? row('Aircon hot day', `weekdays: if forecast ≥ ${r.acHotForecast.thresholdC}° → run from ${r.acHotForecast.from} ignoring battery${r.acHotForecast.todayMaxC!=null?` · today max ${r.acHotForecast.todayMaxC}°`:''}`) : '') +
+      (r.acIndoorHotC!=null ? row('Aircon hot indoor', `weekdays: if indoor ≥ ${r.acIndoorHotC}° → start ignoring battery`) : '') +
+      (r.noStartAfterHour!=null ? row('No auto-start after', `${String(r.noStartAfterHour).padStart(2,'0')}:00 · running devices keep going`) : '') +
       row('Heater start gap', `only if water ≥ ${r.mspaTempMargin}° below target`) +
       row('Filter cleanup', `when heater auto-stops, filter stops too — unless a filtration cycle is running`) +
       row('Daytime window', `${String(r.dayStartHour).padStart(2,'0')}:00–${String(r.nightOffHour).padStart(2,'0')}:00 · auto-off at night`) +
