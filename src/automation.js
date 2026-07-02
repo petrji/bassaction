@@ -200,25 +200,17 @@ function decide(readings, state, now = Date.now(), actuate = cfg.controlEnabled,
 
   const decisions = { time: t, soc, devicesFresh: fresh, mspaHeater: null, ac: null, filtration: null };
 
-  if (soc != null) {
-    if (readings.mspa && readings.mspa.ok) {
-      decisions.mspaHeater = evaluateDevice({
-        name: 'mspaHeater', dev: state.mspa, actualOn: readings.mspa.heater,
-        soc, socStart: cfg.soc.mspaStart, socStop: cfg.soc.mspaStop,
-        canStart: mspaCanStart, reachedTarget: mspaReachedTarget, now, t, actuate, fresh,
-      });
-    }
-    // AC control has moved to the ESP (local actuation over MQTT). The cloud no
-    // longer decides or commands the AC — it only reads its state for the
-    // dashboard. Relinquish any ownership the cloud still held so it can't claim
-    // the AC, and surface an informational note instead of a decision.
-    if (state.ac) state.ac.ownedByAuto = false;
-    decisions.ac = { action: null, note: 'AC control moved to ESP (local)' };
-  } else {
-    decisions.note = 'no SOC reading — solar automation skipped this run';
-  }
-
-  decisions.filtration = evaluateFiltration({ fstate: state.filtration, mspa: readings.mspa, t, now, actuate, fresh });
+  // Device control (AC + MSpa heater + filtration) has moved to the ESP, which
+  // now decides and commands both locally. The cloud only reads their state for
+  // the dashboard. The evaluateDevice / evaluateFiltration functions are kept for
+  // reference but no longer drive anything here; we relinquish any ownership the
+  // cloud still held and surface informational notes instead of decisions.
+  if (soc == null) decisions.note = 'no SOC reading — solar automation skipped this run';
+  if (state.mspa) state.mspa.ownedByAuto = false;
+  if (state.ac) state.ac.ownedByAuto = false;
+  decisions.mspaHeater = { action: null, note: 'MSpa control moved to ESP (local)' };
+  decisions.ac = { action: null, note: 'AC control moved to ESP (local)' };
+  decisions.filtration = { note: 'filtration moved to ESP (local)' };
   return decisions;
 }
 

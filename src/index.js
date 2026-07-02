@@ -118,10 +118,13 @@ async function main() {
     catch (e) { actions.push(`[FAIL] ${label}: ${e.message}`); console.error(`[act] ${label}: ${e.message}`); }
   };
 
+  // MSpa heater + filtration and AC start/stop are all handled locally by the ESP
+  // now (see hikvision-stream). automation.decide() returns null actions for them,
+  // so the actuation blocks below stay dormant — the code is kept (not removed) in
+  // case control ever moves back to the cloud. The cloud still reads spa/AC state
+  // for the dashboard but never commands them.
   if (decisions.mspaHeater && decisions.mspaHeater.action)
     await run(`MSpa heater → ${decisions.mspaHeater.action}`, () => mspa.setHeater(decisions.mspaHeater.action === 'on'));
-  // AC start/stop is handled locally by the ESP now (see hikvision-stream). The
-  // cloud still reads AC state for the dashboard but never commands it.
 
   const f = decisions.filtration || {};
   if (f.start) {
