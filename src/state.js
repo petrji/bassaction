@@ -21,6 +21,7 @@ function defaults() {
     cache: { ts: 0, mspa: null, ac: null },  // throttled spa/AC readings (see index.js)
     semsCache: { ts: 0, data: null },         // throttled informational SEMS figures
     forecastCache: { ts: 0, data: null },      // throttled Open-Meteo daily forecast
+    espAuto: { ts: 0, data: null },            // last automation snapshot/history/rules the ESP pushed
     lastSoc: null,                            // last SOC we persisted (commit-on-change gate)
     history: [],                              // last N real actions: { ts, soc, text }
     updatedAt: 0,
@@ -39,6 +40,7 @@ function parse(raw) {
     cache: { ...defaults().cache, ...(o.cache || {}) },
     semsCache: { ...defaults().semsCache, ...(o.semsCache || {}) },
     forecastCache: { ...defaults().forecastCache, ...(o.forecastCache || {}) },
+    espAuto: { ...defaults().espAuto, ...(o.espAuto || {}) },
     history: Array.isArray(o.history) ? o.history : [],
   };
 }

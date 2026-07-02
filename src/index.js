@@ -110,6 +110,18 @@ async function main() {
   const decisions = decide(readings, st, now, cfg.controlEnabled, devicesFresh);
   console.log('decisions:', JSON.stringify(decisions, null, 2));
 
+  // 2b. ESP automation data: the ESP owns all automation now and pushes its own
+  //     snapshot/history/rules in the dispatch payload (client_payload.auto).
+  //     Cache it in state so the scheduled (cron) runs — which have no payload —
+  //     keep publishing the latest ESP data instead of the dormant local decide().
+  let espAuto = null;
+  try {
+    const raw = process.env.ESP_AUTO;
+    if (raw && raw !== 'null' && raw !== 'undefined' && raw !== '') espAuto = JSON.parse(raw);
+  } catch (e) { console.error(`[espAuto] bad JSON: ${e.message}`); }
+  if (espAuto) st.espAuto = { ts: now, data: espAuto };
+  const ea = st.espAuto && st.espAuto.data ? st.espAuto.data : null;
+
   // 3. Act (only if enabled). Each command is best-effort.
   const actions = [];
   const run = async (label, fn) => {
@@ -174,7 +186,8 @@ async function main() {
   const socChanged = decisions.soc != null && decisions.soc !== st.lastSoc;
   if (decisions.soc != null) st.lastSoc = decisions.soc;
   const realAction = cfg.controlEnabled && (actions.length > 0 || f2.start || f2.stop || f2.stopOzone);
-  const meaningful = devicesFresh || socChanged || semsFetched || forecastFetched || !!realAction;
+  const meaningful = devicesFresh || socChanged || semsFetched || forecastFetched ||
+                     !!realAction || !!espAuto;   // fresh ESP data must be persisted + shown
   if (!meaningful) {
     console.log('no meaningful change since last run — skipping write');
     return;
@@ -198,7 +211,18 @@ async function main() {
     mspa: m,
     ac: a,
     devices: { fresh: devicesFresh, ageSec: Math.round((now - st.cache.ts) / 1000) },
-    automation: {
+    // Automation / history / rules come from the ESP when it has pushed them
+    // (it owns all automation now); the dormant local decide() output is only
+    // the placeholder until the first ESP push after a state reset.
+    automation: ea ? {
+      source: 'esp',
+      ageSec: Math.round((now - (st.espAuto.ts || now)) / 1000),
+      soc: ea.soc,
+      mspaHeater: ea.mspaHeater,
+      ac: ea.ac,
+      filtration: ea.filtration,
+      ownership: ea.ownership,
+    } : {
       soc: decisions.soc,
       mspaHeater: decisions.mspaHeater,
       ac: decisions.ac,
@@ -206,8 +230,14 @@ async function main() {
       ownership: { mspa: st.mspa.ownedByAuto, ac: st.ac.ownedByAuto },
     },
     actions,
-    history: st.history,
-    rules: {
+    history: (ea && Array.isArray(ea.history) && ea.history.length) ? ea.history : st.history,
+    rules: (ea && ea.rules) ? {
+      ...ea.rules,
+      acHotForecast: ea.rules.acHotForecast ? {
+        ...ea.rules.acHotForecast,
+        todayMaxC: forecastData ? forecastData.maxTempC : null,  // forecast is still read here
+      } : null,
+    } : {
       socStart:    { mspa: cfg.soc.mspaStart, ac: cfg.soc.acStart },
       socStop:     { mspa: cfg.soc.mspaStop,  ac: cfg.soc.acStop, acWeekend: cfg.soc.acStopWeekend },
       mspaTempMargin: cfg.mspaTempMargin,

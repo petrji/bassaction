@@ -37,6 +37,7 @@ jobs:
         env:
           CONTROL_ENABLED:      ${{ vars.CONTROL_ENABLED }}
           SOC_OVERRIDE:         ${{ github.event.client_payload.soc }}
+          ESP_AUTO:             ${{ toJSON(github.event.client_payload.auto) }}
           ESP_PV:               ${{ github.event.client_payload.pv }}
           ESP_LOAD:             ${{ github.event.client_payload.load }}
           ESP_GRID:             ${{ github.event.client_payload.grid }}

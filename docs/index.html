@@ -153,10 +153,14 @@ function render(s) {
     cards.push(card('❄️ Toshiba AC', `<div class="err">${a.error||'unavailable'}</div>`));
   }
 
-  // Automation
+  // Automation (decided on the ESP display; the cloud just republishes it)
   const au = s.automation || {};
   const dec = (d) => d ? (d.action ? `${d.action} — ${d.note}` : d.note) : '—';
+  const auSrc = au.source === 'esp'
+    ? `ESP (local)${au.ageSec != null && au.ageSec > 900 ? ` · ${Math.round(au.ageSec/60)}m old` : ''}`
+    : null;
   cards.push(card('⚙️ Automation',
+    (auSrc ? row('Source', `<span class="v">${auSrc}</span>`) : '') +
     row('SOC seen', n(au.soc,'%')) +
     row('MSpa owned by auto', pill(au.ownership&&au.ownership.mspa, 'yes','no')) +
     row('AC owned by auto', pill(au.ownership&&au.ownership.ac, 'yes','no')) +
